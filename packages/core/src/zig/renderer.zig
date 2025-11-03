@@ -538,8 +538,9 @@ pub const CliRenderer = struct {
             var runStart: i64 = -1;
             var runLength: u32 = 0;
 
-            for (0..self.width) |ux| {
-                const x = @as(u32, @intCast(ux));
+            var x: u32 = 0;
+            // Loop increment: +1 per iteration, plus additional skip for wide character continuation cells
+            while (x < self.width) : (x += 1) {
                 const currentCell = self.currentRenderBuffer.get(x, y);
                 const nextCell = self.nextRenderBuffer.get(x, y);
 
@@ -568,7 +569,12 @@ pub const CliRenderer = struct {
                 const bgMatch = currentBg != null and buf.rgbaEqual(currentBg.?, cell.bg, colorEpsilon);
                 const sameAttributes = fgMatch and bgMatch and @as(i16, cell.attributes) == currentAttributes;
 
-                if (!sameAttributes or runStart == -1) {
+                // Check if we need to move cursor or change attributes
+                // Always move after wide character to sync cursor position with terminal
+                const needsMove = !sameAttributes or runStart == -1;
+                const afterWideChar = x > 0 and gp.isGraphemeChar(currentCell.?.char);
+
+                if (needsMove or afterWideChar) {
                     if (runLength > 0) {
                         writer.writeAll(ansi.ANSI.reset) catch {};
                     }
@@ -610,18 +616,17 @@ pub const CliRenderer = struct {
                         std.debug.panic("Fatal: no grapheme bytes in pool for gid {d}", .{gid});
                     };
                     if (bytes.len > 0) {
+                        const graphemeWidth = gp.charRightExtent(cell.char) + 1;
                         const capabilities = self.terminal.getCapabilities();
                         if (capabilities.explicit_width) {
-                            const graphemeWidth = gp.charRightExtent(cell.char) + 1;
                             ansi.ANSI.explicitWidthOutput(writer, graphemeWidth, bytes) catch {};
                         } else {
                             writer.writeAll(bytes) catch {};
                         }
                     }
-                } else if (gp.isContinuationChar(cell.char)) {
-                    // Write a space for continuation cells to clear any previous content
-                    writer.writeByte(' ') catch {};
-                } else {
+                } else if (!gp.isContinuationChar(cell.char)) {
+                    // Don't render continuation cells - they were already part of a wide character
+                    // Only render regular characters
                     const len = std.unicode.utf8Encode(@intCast(cell.char), &utf8Buf) catch 1;
                     writer.writeAll(utf8Buf[0..len]) catch {};
                 }
@@ -629,19 +634,26 @@ pub const CliRenderer = struct {
 
                 // Update the current buffer with the new cell
                 self.currentRenderBuffer.setRaw(x, y, nextCell.?);
+                cellsUpdated += 1;
 
                 // If this is a grapheme start, also update all continuation cells
+                // and skip rendering them in subsequent loop iterations
                 if (gp.isGraphemeChar(nextCell.?.char)) {
                     const rightExtent = gp.charRightExtent(nextCell.?.char);
+                    // Defensive check: rightExtent should never be 0 for a grapheme
+                    std.debug.assert(rightExtent > 0);
                     var k: u32 = 1;
                     while (k <= rightExtent and x + k < self.width) : (k += 1) {
                         if (self.nextRenderBuffer.get(x + k, y)) |contCell| {
                             self.currentRenderBuffer.setRaw(x + k, y, contCell);
+                            cellsUpdated += 1;
                         }
                     }
+                    // Skip the continuation cells: loop header adds +1, we add +rightExtent
+                    // Total: x += (1 from loop header + rightExtent from here) = x increments past continuation cells
+                    // Example: wide char at x=0 (rightExtent=1) → next iteration x=2 (skips x=1)
+                    x += rightExtent;
                 }
-
-                cellsUpdated += 1;
             }
         }
 
