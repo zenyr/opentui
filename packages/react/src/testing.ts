@@ -4,6 +4,8 @@ import { AppContext } from "./components/app"
 import { _render } from "./reconciler/reconciler"
 import { ErrorBoundary } from "./components/error-boundary"
 
+export type TestSetup = Awaited<ReturnType<typeof testRender>>
+
 export async function testRender(node: ReactNode, rendererConfig: CliRendererConfig = {}) {
   const renderer = await createCliRenderer(rendererConfig)
   engine.attach(renderer)
@@ -33,5 +35,19 @@ export async function testRender(node: ReactNode, rendererConfig: CliRendererCon
     resize: (width: number, height: number) => {
       // Resize not implemented for React test renderer
     },
+  }
+}
+
+export async function withTestRender<T>(
+  node: ReactNode,
+  test: (setup: TestSetup) => T | Promise<T>,
+  rendererConfig: CliRendererConfig = {},
+): Promise<T> {
+  const setup = await testRender(node, rendererConfig)
+  await setup.renderOnce()
+  try {
+    return await test(setup)
+  } finally {
+    setup.renderer.destroy()
   }
 }
