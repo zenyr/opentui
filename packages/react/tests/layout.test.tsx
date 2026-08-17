@@ -16,7 +16,6 @@ describe("React Renderer | Layout Tests", () => {
   afterAll(() => {
     console.error = originalConsoleError
   })
-
   beforeEach(async () => {
     if (testSetup) {
       testSetup.renderer.destroy()
@@ -336,58 +335,6 @@ describe("React Renderer | Layout Tests", () => {
       expect(boxRef.focused).toBe(false)
     })
   })
-
-  // describe("Reactive Updates", () => {
-  //   it("should handle reactive state changes", async () => {
-  //     const [counter, setCounter] = createSignal(0)
-
-  //     testSetup = await testRender(<text>Counter: {counter()}</text>, {
-  //       width: 15,
-  //       height: 3,
-  //     })
-
-  //     await testSetup.renderOnce()
-  //     const initialFrame = testSetup.captureCharFrame()
-
-  //     setCounter(5)
-  //     await testSetup.renderOnce()
-  //     const updatedFrame = testSetup.captureCharFrame()
-
-  //     expect(initialFrame).toMatchSnapshot()
-  //     expect(updatedFrame).toMatchSnapshot()
-  //     expect(updatedFrame).not.toBe(initialFrame)
-  //   })
-
-  //   it("should handle conditional rendering", async () => {
-  //     const [showText, setShowText] = createSignal(true)
-
-  //     testSetup = await testRender(
-  //       () => (
-  //         <text wrapMode="none">
-  //           Always visible
-  //           <Show when={showText()} fallback="">
-  //             {" - Conditional text"}
-  //           </Show>
-  //         </text>
-  //       ),
-  //       {
-  //         width: 30,
-  //         height: 3,
-  //       },
-  //     )
-
-  //     await testSetup.renderOnce()
-  //     const visibleFrame = testSetup.captureCharFrame()
-
-  //     setShowText(false)
-  //     await testSetup.renderOnce()
-  //     const hiddenFrame = testSetup.captureCharFrame()
-
-  //     expect(visibleFrame).toMatchSnapshot()
-  //     expect(hiddenFrame).toMatchSnapshot()
-  //     expect(hiddenFrame).not.toBe(visibleFrame)
-  //   })
-  // })
 
   describe("Complex Layouts", () => {
     it("should render complex nested layout correctly", async () => {
